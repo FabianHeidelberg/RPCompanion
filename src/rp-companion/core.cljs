@@ -8,11 +8,13 @@
 (rf/reg-event-db
   :initialize
   (fn [_ _]
-    {:entities {
+    {:entities {}
         1 {:position [100 100] :color "red" :id 1}
         2 {:position [100 500] :color "blue" :id 2}
-        3 {:position [50 20] :color "orang" :id 3}}
-     :actions []}))
+        3 {:position [50 20] :color "orang" :id 3}
+     :actions [{:type "move" :data {:position [30 120]} :creator "player" :entity-id 1}
+               {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]}))  
+
 
 ;; -- Domino 4 - Query  -------------------------------------------------------
 
