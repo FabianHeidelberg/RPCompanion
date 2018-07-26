@@ -13,7 +13,7 @@
         2 {:position [100 500] :color "blue" :id 2}
         3 {:position [50 20] :color "orang" :id 3}
      :actions [{:type "move" :data {:position [30 120]} :creator "player" :entity-id 1}
-               {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]}))  
+               {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]}))
 
 
 ;; -- Domino 4 - Query  -------------------------------------------------------
@@ -23,12 +23,19 @@
   (fn [db _]     ;; db is current app state. 2nd unused param is query vector
     (vals (:entities db)))) ;; return a query computation over the application state
 
+(rf/reg-sub :actions
+            fn [db _]
+            ((map (fn [action]
+                    (let [entity-id (:entity-id action)]
+                      (assoc action :entity (get-in db [:entities])))))))
+
+
 ;; -- Domino 5 - View Functions ----------------------------------------------
 
 
 (defn entityView [{color :color
                    [x y] :position
-                    id :id }]
+                    id :id}]
   [:circle {:cx x
             :cy y
             :r 20
@@ -36,7 +43,7 @@
             :key id}])
 
 (defn entitiesView [{:keys [entities]}]
-  (let [entities @(rf/subscribe [:entities]) ]
+  (let [entities @(rf/subscribe [:entities])]
     [:g {} (map entityView entities)]))
 
 (defn ui []
