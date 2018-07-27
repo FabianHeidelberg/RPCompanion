@@ -13,7 +13,17 @@
                 2 {:position [100 500] :color "blue" :id 2}
                 3 {:position [50 20] :color "orang" :id 3}}
      :actions [{:type "move" :data {:position [30 120]} :creator "player" :entity-id 1}
-               {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]}))
+               {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]})
+ )
+(rf/reg-event-db 
+  :add-entity
+  (fn [db _] 
+    (let [id (Math/random)
+          x (* 300 (Math/random))
+          y (* 300 (Math/random))]
+    (assoc-in db [:entities id] {:position [x y] :color "yellow" :id id} ))))
+
+
 
 
 ;; -- Domino 4 - Query  -------------------------------------------------------
@@ -48,10 +58,12 @@
     [:g {} (map entityView entities)]))
 
 (defn ui []
-  [:svg
-      {:width 500 :height 500}
-      [entitiesView]])
-
+  [:div 
+    [:svg
+          {:width 500 :height 500}
+          [entitiesView]]
+    [:button {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]])
+  
 
 ;; -- Entry Point -------------------------------------------------------------
 
