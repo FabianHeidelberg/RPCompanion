@@ -8,10 +8,10 @@
 (rf/reg-event-db
   :initialize
   (fn [_ _]
-    {:entities {}
-        1 {:position [100 100] :color "red" :id 1}
-        2 {:position [100 500] :color "blue" :id 2}
-        3 {:position [50 20] :color "orang" :id 3}
+    {:entities {
+                1 {:position [100 100] :color "red" :id 1}
+                2 {:position [100 500] :color "blue" :id 2}
+                3 {:position [50 20] :color "orang" :id 3}}
      :actions [{:type "move" :data {:position [30 120]} :creator "player" :entity-id 1}
                {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]}))
 
@@ -23,11 +23,12 @@
   (fn [db _]     ;; db is current app state. 2nd unused param is query vector
     (vals (:entities db)))) ;; return a query computation over the application state
 
-(rf/reg-sub :actions
-            fn [db _]
-            ((map (fn [action]
-                    (let [entity-id (:entity-id action)]
-                      (assoc action :entity (get-in db [:entities])))))))
+(rf/reg-sub
+  :actions
+  (fn [db _]
+    (map (fn [action]
+            (let [entity-id (:entity-id action)]
+              (assoc action :entity (get-in db [:entities])))))))
 
 
 ;; -- Domino 5 - View Functions ----------------------------------------------
