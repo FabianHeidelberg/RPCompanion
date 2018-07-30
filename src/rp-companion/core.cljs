@@ -1,93 +1,45 @@
 (ns rp-companion.core
-  (:require [reagent.core :as reagent]
+  (:require-macros [secretary.core :refer [defroute]])
+  (:require [goog.events :as events]
+            [reagent.core :as reagent]
             [re-frame.core :as rf]
-            [clojure.string :as str]))
+            [secretary.core :as secretary]
+            [clojure.string :as str]
+            [rp-companion.master :as master]
+            [rp-companion.viewer :as viewer]
+            [rp-companion.lobby :as lobby])
+  (:import [goog History]
+           [goog.history EventType]))
 
-;; -- Domino 2 - Event Handlers -----------------------------------------------
+`(devtools/install!)
 
-(rf/reg-event-db
-  :initialize
-  (fn [_ _]
-    {:entities {
-                1 {:position [100 100] :color "red" :id 1}
-                2 {:position [100 500] :color "blue" :id 2}
-                3 {:position [50 20] :color "orang" :id 3}}
-     :actions [{:type "move" :data {:position [30 120]} :creator "player" :entity-id 1}
-               {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]}))
+(def app-node (js/document.getElementById "app"))
 
-(rf/reg-event-db 
-  :add-entity
-  (fn [db _] 
-    (let [id (Math/random)
-          x (* 300 (Math/random))
-          y (* 300 (Math/random))]
-    (assoc-in db [:entities id] {:position [x y] :color "yellow" :id id} ))))
+;; Define routes
 
+(defroute "/" []
+  (do
+    (rf/dispatch-sync [:initialize])
+    (reagent/render [lobby/main-view] app-node)))
 
+(defroute "/master/:id" [id]
+  (do
+    (rf/dispatch-sync [:initialize id])
+    (reagent/render [master/main-view] app-node)))
 
-
-;; -- Domino 4 - Query  -------------------------------------------------------
-
-(rf/reg-sub
-  :entities
-  (fn [db _]     ;; db is current app state. 2nd unused param is query vector
-    (vals (:entities db)))) ;; return a query computation over the application state
-
-(rf/reg-sub
-  :actions
-  (fn [db _]
-    (map (fn [action]
-            (let [entity-id (:entity-id action)]
-              (assoc action :entity (get-in db [:entities entity-id])))))))
+(defroute "/viewer/:id" [id]
+  (do
+    (rf/dispatch-sync [:initialize id])
+    (reagent/render [viewer/main-view] app-node)))
 
 
-;; -- Domino 5 - View Functions ----------------------------------------------
+;; Hookup routing
 
-
-(defn entityView [{color :color
-                   [x y] :position
-                    id :id}]
-  [:circle {:cx x
-            :cy y
-            :r 20
-            :fill color
-            :key id}])
-
-(defn entitiesView [{:keys [entities]}]
-  (let [entities @(rf/subscribe [:entities])]
-    [:g {} (map entityView entities)]))
-
-(defn menu-item-view [{icon :icon name :name}])
-(def menu-items [{:label "enemies" 
-                  :type-instances [
-                    {:icon "orc.svg" :name "Orc"} 
-                    {:icon "goblin.svg" :name "Goblin"}
-                    {:icon "spider.svg" :name "Spider"}
-                    {:icon "wolf.svg" :name "Wolf"}]}
-                {:label "objects" 
-                :type-instances [
-                  {:icon "treasure-chest.svg" :name "Treasure chest"}
-                  {:icon "campfire.svg" :name "Campfire"}
-                  {:icon "bag.svg" :name "Bag"}]} 
-                {:label "players" 
-                :type-instances [
-                  {:icon "sourcerer.svg" :name "sourcerer"}
-                  {:icon "knight.svg" :name "Knight"}
-                  {:icon "paladine.svg" :name "Paladine"}
-                  {:icon "Barbar.svg" :name "Barbar"}]}])
-
-(defn ui []
-  [:div 
-    [:svg
-          {:width 500 :height 500}
-          [entitiesView]]
-    [:button {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]])
-  
-
-;; -- Entry Point -------------------------------------------------------------
+(def history
+  (doto (History.)
+    (events/listen EventType.NAVIGATE
+      (fn [event] (secretary/dispatch! (.-token event))))
+    (.setEnabled true)))
 
 (defn ^:export run
-  []
-  (rf/dispatch-sync [:initialize])     ;; puts a value into application state
-  (reagent/render [ui]              ;; mount the application's ui into '<div id="app" />'
-                  (js/document.getElementById "app")))
+  [])
