@@ -10,11 +10,9 @@
   (fn [_ [_ room-id]]
     {:room-id room-id
      :entities {
-                1 {:position [100 100] :color "red" :id 1}
-                2 {:position [100 500] :color "blue" :id 2}
-                3 {:position [50 20] :color "orang" :id 3}}
-     :actions [{:type "move" :data {:position [30 120]} :creator "player" :entity-id 1}
-               {:type "move" :data {:position [400 300]} :creator "player" :entity-id 3}]}))
+                1 {:position [100 100] :color "red" :id 1 :actions {:next-position [100 100] :will-be-deleted false}}
+                2 {:position [100 500] :color "blue" :id 2 :actions {:next-position [100 500] :will-be-deleted false}}
+                3 {:position [50 20] :color "orang" :id 3 :actions {:next-position [50 20] :will-be-deleted false}}}}))
 
 (rf/reg-event-db
   :add-entity
@@ -23,6 +21,15 @@
           x (* 300 (Math/random))
           y (* 300 (Math/random))]
     (assoc-in db [:entities id] {:position [x y] :color "yellow" :id id} ))))
+
+ (rf/reg-event-db
+   :update-next-position
+   (fn [db [_ data]]
+       (let [id (:id data)
+             position (:position data)]
+            (do
+              (println "updated entity" id position db)
+              (assoc-in db [:entities id :actions :next-position] position)))))
 
 ;; Subscriptions
 
@@ -36,21 +43,46 @@
   (fn [db _]
     (:room-id db)))
 
-(rf/reg-sub
-  :actions
-  (fn [db _]
-    (map (fn [action]
-            (let [entity-id (:entity-id action)]
-              (assoc action :entity (get-in db [:entities])))))))
-
-
 ;; Views
 
 (defn entity-view
   [{color :color
     [x y] :position
+    actions :actions
     id :id}]
-  [:circle {:cx x :cy y :r 20 :fill color :key id}])
+      (let [next-pos (:next-position actions)
+            next-x (first next-pos)
+            next-y (second next-pos)]
+           [:g {:key id}
+            [:circle {:cx x
+                      :cy y
+                      :r 20
+                      :fill color
+                      :on-touch-start (fn [event]
+                                          (let [touches (.. event -changedTouches)
+                                                touch (.item touches 0)
+                                                touch-x (.-clientX touch)
+                                                touch-y (.-clientY touch)]
+                                               (print "clicked " id)))
+                      :on-touch-move (fn [event]
+                                         (let [touches (.. event -changedTouches)
+                                               touch (.item touches 0)
+                                               touch-x (.-clientX touch)
+                                               touch-y (.-clientY touch)]
+                                              (do
+                                                (println "moved" id touch-x touch-y)
+                                                (rf/dispatch [:update-next-position {:id id :position [touch-x touch-y]}]))))
+                      :on-touch-end (fn [event]
+                                        (let [touches (.. event -changedTouches)
+                                              touch (.item touches 0)
+                                              touch-x (.-clientX touch)
+                                              touch-y (.-clientY touch)]
+                                             (println "ended" id)))}]
+           [:circle {:cx next-x
+                     :cy next-y
+                     :r 10
+                     :fill "#000"
+                     }]]))
 
 (defn entities-view [{:keys [entities]}]
   [:g {} (map entity-view entities)])
@@ -78,7 +110,6 @@
   (let [entities @(rf/subscribe [:entities])
         room-id @(rf/subscribe [:room-id])]
     [:div
-      [:h1 room-id]
       [:svg
         {:width 500 :height 500}
         [entities-view {:entities entities}]]
