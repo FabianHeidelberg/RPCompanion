@@ -27,9 +27,17 @@
    (fn [db [_ data]]
        (let [id (:id data)
              position (:position data)]
-            (do
-              (println "updated entity" id position db)
-              (assoc-in db [:entities id :actions :next-position] position)))))
+            (assoc-in db [:entities id :actions :next-position] position))))
+
+(rf/reg-event-db
+  :apply-next-pos
+  (fn [db _]
+      (let [entities (:entities db)
+            updated-entities (apply hash-map
+                                    (flatten (map (fn [[key entity]]
+                                       (let [new-position (get-in entity [:actions :next-position])]
+                                              [key (assoc entity :position new-position)])) entities)))]
+             (assoc db :entities updated-entities))))
 
 ;; Subscriptions
 
@@ -54,35 +62,25 @@
             next-x (first next-pos)
             next-y (second next-pos)]
            [:g {:key id}
+            (when (or (not= x next-x) (not= y next-y))
+                  [:line.connector {:x1 x
+                    :y1 y
+                    :x2 next-x
+                    :y2 next-y}])
             [:circle {:cx x
                       :cy y
                       :r 20
-                      :fill color
-                      :on-touch-start (fn [event]
-                                          (let [touches (.. event -changedTouches)
-                                                touch (.item touches 0)
-                                                touch-x (.-clientX touch)
-                                                touch-y (.-clientY touch)]
-                                               (print "clicked " id)))
-                      :on-touch-move (fn [event]
-                                         (let [touches (.. event -changedTouches)
-                                               touch (.item touches 0)
-                                               touch-x (.-clientX touch)
-                                               touch-y (.-clientY touch)]
-                                              (do
-                                                (println "moved" id touch-x touch-y)
-                                                (rf/dispatch [:update-next-position {:id id :position [touch-x touch-y]}]))))
-                      :on-touch-end (fn [event]
-                                        (let [touches (.. event -changedTouches)
-                                              touch (.item touches 0)
-                                              touch-x (.-clientX touch)
-                                              touch-y (.-clientY touch)]
-                                             (println "ended" id)))}]
-           [:circle {:cx next-x
-                     :cy next-y
-                     :r 10
-                     :fill "#000"
-                     }]]))
+                      :fill color}]
+            [:circle.ghost-entity {:cx next-x
+                                   :cy next-y
+                                   :r 20
+                                   :fill color
+                                   :on-touch-move (fn [event]
+                                                    (let [touches (.. event -changedTouches)
+                                                          touch (.item touches 0)
+                                                          touch-x (.-clientX touch)
+                                                          touch-y (.-clientY touch)]
+                                                         (rf/dispatch [:update-next-position {:id id :position [touch-x touch-y]}])))}]]))
 
 (defn entities-view [{:keys [entities]}]
   [:g {} (map entity-view entities)])
@@ -109,10 +107,12 @@
 (defn main-view []
   (let [entities @(rf/subscribe [:entities])
         room-id @(rf/subscribe [:room-id])]
-    [:div
-      [:svg
-        {:width 500 :height 500}
-        [entities-view {:entities entities}]]
+       [:div
+        [:svg
+         {:width 500 :height 500}
+         [entities-view {:entities entities}]]
         [:button
-          {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]]))
+         {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]
+        [:button
+         {:on-click #(rf/dispatch [:apply-next-pos])} "Apply changes"]]))
 

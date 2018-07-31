@@ -4,6 +4,22 @@ div, h1, input {
     color: #777;
 }
 
+@keyframes dash {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+.connector {
+    stroke: black;
+    stroke-dasharray: 20;
+    animation: dash 30s linear infinite;
+}
+
+.ghost-entity {
+    opacity: 0.5;
+}
+
 .example-clock {
     font-size: 128px;
     line-height: 1.2em;
