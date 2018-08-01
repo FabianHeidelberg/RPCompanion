@@ -12,6 +12,7 @@
            [goog.history EventType]))
 
 `(devtools/install!)
+(enable-console-print!)
 
 (def app-node (js/document.getElementById "app"))
 
