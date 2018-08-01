@@ -20,6 +20,10 @@ div, h1, input {
     opacity: 0.5;
 }
 
+.animated-entity {
+    transition: 1s ease-in-out;
+}
+
 .example-clock {
     font-size: 128px;
     line-height: 1.2em;
