@@ -13,8 +13,7 @@
                 1 {:position [100 100] :color "red" :id 1 :actions {:next-position nil :will-be-deleted false}}
                 2 {:position [100 500] :color "blue" :id 2 :actions {:next-position nil :will-be-deleted false}}
                 3 {:position [50 20] :color "orang" :id 3 :actions {:next-position nil :will-be-deleted false}}}
-      :grabbed-entity-id nil
-      :moved-entities []}))
+      :grabbed-entity nil}))
 
 (rf/reg-event-db
   :add-entity
@@ -26,21 +25,37 @@
 
 (rf/reg-event-db
   :grab-entity
-  [re-frame.core/debug]
  (fn [db [_ id]]
-       (assoc db :grabbed-entity-id id)))
+       (assoc db :grabbed-entity {:id id :moved false :timestamp (.getTime (js/Date.))})))
+
+
+(defn apply-position [db id]
+      (let [entity (get-in db [:entities id])]
+        (if-not (nil? (get-in entity [:actions :next-position])) 
+          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position])) 
+          db)))
 
 (rf/reg-event-db
   :release-entity
   (fn [db] 
-    (assoc db :grabbed-entity-id nil)))
+  (let [timestamp (get-in db [:grabbed-entity :timestamp]) 
+        time-diff (- (.getTime (js/Date.)) timestamp)] 
+    (if (or (get-in db [:grabbed-entity :move]) (> time-diff 200)) 
+      (assoc db :grabbed-entity nil) 
+      (-> db 
+        (apply-position (get-in db [:grabbed-entity :id]))
+        (assoc :grabbed-entity nil))))))
+
+
 
  (rf/reg-event-db
    :update-next-position
    (fn [db [_ data]]
        (let [id (:id data)
              position (:position data)]
-            (assoc-in db [:entities id :actions :next-position] position))))
+            (-> db 
+              (assoc-in [:grabbed-entity :moved] true)
+              (assoc-in [:entities id :actions :next-position] position)))))
 
 (rf/reg-event-db
   :apply-next-pos
@@ -56,6 +71,14 @@
                                  (apply hash-map))]
              (assoc db :entities updated-entities))))
 
+(rf/reg-event-db
+  :fast-apply-next-pos
+  (fn [db [_ id]]
+      (let [entity (get-in db [:entities id])]
+        (if-not (nil? (get-in entity [:actions :next-position])) 
+          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position])) 
+          db))))
+
 ;; Subscriptions
 
 (rf/reg-sub
@@ -69,13 +92,13 @@
     (:room-id db)))
 
 (rf/reg-sub
-  :grabbed-entity-id
+  :grabbed-entity
   (fn [db _]
-    (:grabbed-entity-id db)))
+    (:grabbed-entity db)))
 ;; Views
 
 (defn entity-view
-  [ grabbed-entity-id
+  [ grabbed-entity
     {color :color
     [x y] :position
     actions :actions
@@ -98,8 +121,8 @@
                                       :fill color
                                       :on-mouse-down #(rf/dispatch [:grab-entity id])}]]))
 
-(defn entities-view [{:keys [entities grabbed-entity-id]}]
-  [:g {} (map (partial entity-view grabbed-entity-id) entities)])
+(defn entities-view [{:keys [entities grabbed-entity]}]
+  [:g {} (map (partial entity-view grabbed-entity) entities)])
 
 (defn menu-item-view [{icon :icon name :name}])
 (def menu-items [{:label "enemies"
@@ -123,13 +146,13 @@
 (defn main-view []
   (let [entities @(rf/subscribe [:entities])
         room-id @(rf/subscribe [:room-id])
-        grabbed-entity-id @(rf/subscribe [:grabbed-entity-id])]
+        grabbed-entity @(rf/subscribe [:grabbed-entity])
+        grabbed-entity-id (:id grabbed-entity)]
        [:div
         [:svg
          {:width 500 :height 500 
           :on-mouse-move (fn [event] (let  [x (.-clientX event)
-                                            y (.-clientY event)
-                                            _ (print (str "mouse move" (nil? grabbed-entity-id) ")"))]
+                                            y (.-clientY event)]
                                           
                                           (if-not (nil? grabbed-entity-id)
                                         (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [x y]}]))))
