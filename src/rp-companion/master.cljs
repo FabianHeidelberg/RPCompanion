@@ -115,11 +115,13 @@
               [:circle.ghost-entity {:transform (str "translate(" next-x "," next-y ")")
                                      :r 20
                                      :fill color
-              :on-mouse-down #(rf/dispatch [:grab-entity id])}])
+              :on-mouse-down #(rf/dispatch [:grab-entity id])
+              :on-touch-start #(rf/dispatch [:grab-entity id])}])
             [:circle.animated-entity {:transform (str "translate(" x "," y ")")
                                       :r 20
                                       :fill color
-                                      :on-mouse-down #(rf/dispatch [:grab-entity id])}]]))
+                                      :on-mouse-down #(rf/dispatch [:grab-entity id])
+                                      :on-touch-start #(rf/dispatch [:grab-entity id])}]]))
 
 (defn entities-view [{:keys [entities grabbed-entity]}]
   [:g {} (map (partial entity-view grabbed-entity) entities)])
@@ -156,7 +158,15 @@
                                           
                                           (if-not (nil? grabbed-entity-id)
                                         (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [x y]}]))))
-        :on-mouse-up #(rf/dispatch [:release-entity])}
+        :on-touch-move (fn [event]
+                          (let [touches (.. event -changedTouches)
+                                touch (.item touches 0)
+                                touch-x (.-clientX touch)
+                                touch-y (.-clientY touch)]
+                            (if-not (nil? grabbed-entity-id)  
+                            (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))  
+        :on-mouse-up #(rf/dispatch [:release-entity])
+        :on-touch-end #(rf/dispatch [:release-entity])}
          [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id}]]
         [:button
          {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]
