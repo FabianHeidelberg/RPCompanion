@@ -191,12 +191,12 @@
                           (.stopPropagation evt)
                           (rf/dispatch [:select-menu-type :players]))}]] 
   
-  [:g (map-indexed (fn [index item] [:circle {:transform (str "rotate("(* index (/ 360 (count (get menu-items type))))") translate(0, 50)")
+  [:g (map-indexed (fn [index item] [:circle {:transform (str "rotate("(* index (/ 360 (count (get-in menu-items [type :type-instances]))))") translate(0, 50)")
           :r 20
           :cx 0
           :cy 0
           :fill "blue"
-          :on-click #(rf/dispatch [:add-entity {:position [x y] :color "yellow"}])}]) (get menu-items type))])])
+          :on-click #(rf/dispatch [:add-entity {:position [x y] :color "yellow"}])}]) (get-in menu-items [type :type-instances]))])])
 
 (defn main-view []
   (let [entities @(rf/subscribe [:entities])
