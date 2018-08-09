@@ -18,11 +18,9 @@
 
 (rf/reg-event-db
   :add-entity
-  (fn [db _]
-    (let [id (Math/random)
-          x (* 300 (Math/random))
-          y (* 300 (Math/random))]
-    (assoc-in db [:entities id] {:position [x y] :color "yellow" :id id} ))))
+  (fn [db [_ {:keys [text color position]}]]
+    (let [id (rand)]
+      (assoc-in db [:entities id] {:position position :color color :id id}))))
 
 (rf/reg-event-db
   :grab-entity
@@ -35,6 +33,12 @@
   (fn [db [_ [x y]]]
   (if (nil? (:menu db)) (assoc db :menu {:position [x y]}) 
     (dissoc db :menu))))
+
+
+(rf/reg-event-db
+  :select-menu-type
+  (fn [db [_ type]] 
+    (assoc-in db [:menu :type] type)))
 
 
 (defn apply-position [db id]
@@ -129,7 +133,8 @@
                                      :r 20
                                      :fill color
               :on-mouse-down #(rf/dispatch [:grab-entity id])
-              :on-touch-start #(rf/dispatch [:grab-entity id])}])
+              :on-touch-start #(rf/dispatch [:grab-entity id])
+              :on-click #(.stopPropagation %)}])
             [:circle.animated-entity {:transform (str "translate(" x "," y ")")
                                       :r 20
                                       :fill color
@@ -140,44 +145,58 @@
   [:g {} (map (partial entity-view grabbed-entity) entities)])
 
 (defn menu-item-view [{icon :icon name :name}])
-(def menu-items [{:label "enemies"
+(def menu-items {:enemies {:label "enemies"
                   :type-instances [
                     {:icon ":orc.svg" :name "Orc"}
                     {:icon "goblin.svg" :name "Goblin"}
                     {:icon "spider.svg" :name "Spider"}
                     {:icon "wolf.svg" :name "Wolf"}]}
-                {:label "objects"
+                :objects {:label "objects"
                 :type-instances [
                   {:icon "treasure-chest.svg" :name "Treasure chest"}
                   {:icon "campfire.svg" :name "Campfire"}
                   {:icon "bag.svg" :name "Bag"}]}
-                {:label "players"
+                :players {:label "players"
                 :type-instances [
                   {:icon "sourcerer.svg" :name "sourcerer"}
                   {:icon "knight.svg" :name "Knight"}
                   {:icon "paladine.svg" :name "Paladine"}
-                  {:icon "Barbar.svg" :name "Barbar"}]}])
+                  {:icon "Barbar.svg" :name "Barbar"}]}})
 
-(defn menu-view [{[x y] :position}] 
+(defn menu-view [{[x y] :position type :type}] 
  [:g {:transform (str "translate("x "," y")" )} 
-   [:circle {:transform (str "rotate(0) translate(0, 50)")
+  (if (nil? type) 
+   [:g [:circle {:transform (str "rotate(0) translate(0, 50)")
             :r 20
             :cx 0
             :cy 0
             :fill "green"
-            :on-click #(rf/dispatch [:select-menu-type "enemies"])}]
+            :on-click (fn [evt] 
+                          (.stopPropagation evt)
+                          (rf/dispatch [:select-menu-type :enemies]))}]
    [:circle {:transform (str "rotate(120) translate(0, 50)")
             :r 20
             :cx 0
             :cy 0
             :fill "red"
-            :on-click #(rf/dispatch [:select-menu-type "objects"])}]
+            :on-click (fn [evt] 
+                          (.stopPropagation evt)
+                          (rf/dispatch [:select-menu-type :objects]))}]
   [:circle {:transform (str "rotate(240) translate(0, 50)")
           :r 20
           :cx 0
           :cy 0
           :fill "blue"
-          :on-click #(rf/dispatch [:select-menu-type "players"])}]])
+          :on-click (fn [evt] 
+                          (.stopPropagation evt)
+                          (rf/dispatch [:select-menu-type :players]))}]] 
+  
+  [:g (map-indexed (fn [index item] [:circle {:transform (str "rotate("(* index (/ 360 (count (get menu-items type))))") translate(0, 50)")
+          :r 20
+          :cx 0
+          :cy 0
+          :fill "blue"
+          :on-click #(rf/dispatch [:add-entity {:position [x y] :color "yellow"}])}]) (get menu-items type))])])
 
 (defn main-view []
   (let [entities @(rf/subscribe [:entities])
@@ -204,8 +223,7 @@
         :on-click (fn [event] (let [x (.-clientX event)
                                     y (.-clientY event)]
                                     (rf/dispatch [:toggle-menu [x y]])))
-        :on-mouse-up #(rf/dispatch [:release-entity])
-        :on-touch-end #(rf/dispatch [:release-entity])}
+        :on-mouse-up #(rf/dispatch [:release-entity])}
          [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id}]
         (if-not (nil? menu)[menu-view menu])
          ]
