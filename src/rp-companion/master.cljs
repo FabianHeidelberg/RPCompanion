@@ -13,7 +13,8 @@
                 1 {:position [100 100] :color "red" :id 1 :actions {:next-position nil :will-be-deleted false}}
                 2 {:position [100 500] :color "blue" :id 2 :actions {:next-position nil :will-be-deleted false}}
                 3 {:position [50 20] :color "orang" :id 3 :actions {:next-position nil :will-be-deleted false}}}
-      :grabbed-entity nil}))
+      :grabbed-entity nil
+      :menu nil}))
 
 (rf/reg-event-db
   :add-entity
@@ -29,6 +30,13 @@
        (assoc db :grabbed-entity {:id id :moved false :timestamp (.getTime (js/Date.))})))
 
 
+(rf/reg-event-db 
+  :toggle-menu 
+  (fn [db [_ [x y]]]
+  (if (nil? (:menu db)) (assoc db :menu {:position [x y]}) 
+    (dissoc db :menu))))
+
+
 (defn apply-position [db id]
       (let [entity (get-in db [:entities id])]
         (if-not (nil? (get-in entity [:actions :next-position])) 
@@ -40,7 +48,7 @@
   (fn [db] 
   (let [timestamp (get-in db [:grabbed-entity :timestamp]) 
         time-diff (- (.getTime (js/Date.)) timestamp)] 
-    (if (or (get-in db [:grabbed-entity :move]) (> time-diff 200)) 
+    (if (or (get-in db [:grabbed-entity :moved]) (> time-diff 200)) 
       (assoc db :grabbed-entity nil) 
       (-> db 
         (apply-position (get-in db [:grabbed-entity :id]))
@@ -95,6 +103,11 @@
   :grabbed-entity
   (fn [db _]
     (:grabbed-entity db)))
+
+(rf/reg-sub 
+  :menu 
+  (fn [db _]
+    (:menu db)))
 ;; Views
 
 (defn entity-view
@@ -129,7 +142,7 @@
 (defn menu-item-view [{icon :icon name :name}])
 (def menu-items [{:label "enemies"
                   :type-instances [
-                    {:icon "orc.svg" :name "Orc"}
+                    {:icon ":orc.svg" :name "Orc"}
                     {:icon "goblin.svg" :name "Goblin"}
                     {:icon "spider.svg" :name "Spider"}
                     {:icon "wolf.svg" :name "Wolf"}]}
@@ -145,10 +158,32 @@
                   {:icon "paladine.svg" :name "Paladine"}
                   {:icon "Barbar.svg" :name "Barbar"}]}])
 
+(defn menu-view [{[x y] :position}] 
+ [:g {:transform (str "translate("x "," y")" )} 
+   [:circle {:transform (str "rotate(0) translate(0, 50)")
+            :r 20
+            :cx 0
+            :cy 0
+            :fill "green"
+            :on-click #(rf/dispatch [:select-menu-type "enemies"])}]
+   [:circle {:transform (str "rotate(120) translate(0, 50)")
+            :r 20
+            :cx 0
+            :cy 0
+            :fill "red"
+            :on-click #(rf/dispatch [:select-menu-type "objects"])}]
+  [:circle {:transform (str "rotate(240) translate(0, 50)")
+          :r 20
+          :cx 0
+          :cy 0
+          :fill "blue"
+          :on-click #(rf/dispatch [:select-menu-type "players"])}]])
+
 (defn main-view []
   (let [entities @(rf/subscribe [:entities])
         room-id @(rf/subscribe [:room-id])
         grabbed-entity @(rf/subscribe [:grabbed-entity])
+        menu @(rf/subscribe [:menu])
         grabbed-entity-id (:id grabbed-entity)]
        [:div
         [:svg
@@ -164,10 +199,17 @@
                                 touch-x (.-clientX touch)
                                 touch-y (.-clientY touch)]
                             (if-not (nil? grabbed-entity-id)  
-                            (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))  
+                            (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))
+                            
+        :on-click (fn [event] (let [x (.-clientX event)
+                                    y (.-clientY event)]
+                                    (rf/dispatch [:toggle-menu [x y]])))
         :on-mouse-up #(rf/dispatch [:release-entity])
         :on-touch-end #(rf/dispatch [:release-entity])}
-         [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id}]]
+         [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id}]
+        (if-not (nil? menu)[menu-view menu])
+         ]
+  
         [:button
          {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]
         [:button
