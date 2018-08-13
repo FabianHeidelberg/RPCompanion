@@ -1,19 +1,46 @@
 (ns rp-companion.master
   (:require [reagent.core :as reagent]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            [cljsjs.simple-peer]))
+
+(defonce master-peer (js/SimplePeer. #js {:trickle false}))
+(defn init-webrtc []
+  (.on master-peer "error" (fn [] (println "Master Error")))
+  (.on master-peer "signal" (fn [data]
+    (do
+      (println "Signaled master")
+      (rf/dispatch [:signal-viewer data]))))
+  (.on master-peer "connect" (fn [] (println "Connected master")))
+  (.on master-peer "data" (fn [data] (println "data" data))))
+
+  (rf/reg-event-fx
+  :signal-master
+  (fn [incoming-effects [_ data]]
+    (do
+      (println "Master data" (js/JSON.stringify data))
+      (.signal master-peer data))))
+
+  (rf/reg-event-fx
+   :send-viewer-data
+   (fn [incoming-effects [_ data]]
+     (do
+       (println "Master" (js/JSON.stringify master-peer))
+       (.send master-peer (str "Hello" data)))))
 
 
 ;; Event handler
-
 (rf/reg-event-db
-  :initialize
+  :master/initialize
   (fn [_ [_ room-id]]
-    {:room-id room-id
-     :entities {
-                1 {:position [100 100] :color "red" :id 1 :actions {:next-position nil :will-be-deleted false}}
-                2 {:position [100 500] :color "blue" :id 2 :actions {:next-position nil :will-be-deleted false}}
-                3 {:position [50 20] :color "orang" :id 3 :actions {:next-position nil :will-be-deleted false}}}
-      :grabbed-entity nil}))
+    (do
+      (init-webrtc)
+      (println "Master" (js/JSON.stringify master-peer))
+      {:room-id room-id
+       :entities {
+                  1 {:position [100 100] :color "red" :id 1 :actions {:next-position nil :will-be-deleted false}}
+                  2 {:position [100 500] :color "blue" :id 2 :actions {:next-position nil :will-be-deleted false}}
+                  3 {:position [50 20] :color "orang" :id 3 :actions {:next-position nil :will-be-deleted false}}}
+        :grabbed-entity nil})))
 
 (rf/reg-event-db
   :add-entity
@@ -39,8 +66,8 @@
   :release-entity
   (fn [db] 
   (let [timestamp (get-in db [:grabbed-entity :timestamp]) 
-        time-diff (- (.getTime (js/Date.)) timestamp)] 
-    (if (or (get-in db [:grabbed-entity :move]) (> time-diff 200)) 
+        time-diff (- (.getTime (js/Date.)) timestamp)]
+    (if (or (get-in db [:grabbed-entity :moved]) (> time-diff 200))
       (assoc db :grabbed-entity nil) 
       (-> db 
         (apply-position (get-in db [:grabbed-entity :id]))
@@ -169,7 +196,9 @@
         :on-touch-end #(rf/dispatch [:release-entity])}
          [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id}]]
         [:button
-         {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]
+         {:on-click (fn [] (do
+                             (rf/dispatch [:add-entity])
+                             (rf/dispatch [:send-viewer-data "test"])))} "Add Entity"]
         [:button
          {:on-click #(rf/dispatch [:apply-next-pos])} "Apply changes"]]))
 

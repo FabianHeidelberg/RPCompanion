@@ -13,7 +13,7 @@
 ;; Event handlers
 
 (rf/reg-event-db
-  :initialize
+  :lobby/initialize
   (fn [_ _]
     {:room-id "" }))
 
