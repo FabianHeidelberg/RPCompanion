@@ -6,7 +6,7 @@
 ;; Event handler
 
 (rf/reg-event-db
-  :initialize
+  :master/initialize
   (fn [_ [_ room-id]]
     {:room-id room-id
      :entities {

@@ -20,17 +20,17 @@
 
 (defroute "/" []
   (do
-    (rf/dispatch-sync [:initialize])
+    (rf/dispatch-sync [:lobby/initialize])
     (reagent/render [lobby/main-view] app-node)))
 
 (defroute "/master/:id" [id]
   (do
-    (rf/dispatch-sync [:initialize id])
+    (rf/dispatch-sync [:master/initialize id])
     (reagent/render [master/main-view] app-node)))
 
 (defroute "/viewer/:id" [id]
   (do
-    (rf/dispatch-sync [:initialize id])
+    (rf/dispatch-sync [:viewer/initialize id])
     (reagent/render [viewer/main-view] app-node)))
 
 
