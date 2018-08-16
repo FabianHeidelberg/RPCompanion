@@ -14,6 +14,7 @@
                 1 {:position [100 100] :color "red" :id 1 :actions {:next-position nil :will-be-deleted false}}
                 2 {:position [100 500] :color "blue" :id 2 :actions {:next-position nil :will-be-deleted false}}
                 3 {:position [50 20] :color "orang" :id 3 :actions {:next-position nil :will-be-deleted false}}}
+      :grabbed-entity nil
       :selected-entity nil}))
 
 (rf/reg-event-db
@@ -27,13 +28,20 @@
 (rf/reg-event-db
   :delete-entity
  (fn [db [_ id]]
-    (utils/dissoc-in db [:entities id])))
+    (do
+      (rf/dispatch [:release-entity])
+      (rf/dispatch [:deselect-entity])
+      (utils/dissoc-in db [:entities id]))))
 
 (rf/reg-event-db
   :grab-entity
  (fn [db [_ id]]
-       (assoc db :selected-entity {:id id :moved false :timestamp (.getTime (js/Date.))})))
+       (assoc db :grabbed-entity {:id id :moved false :timestamp (.getTime (js/Date.))})))
 
+(rf/reg-event-db
+  :select-entity
+  (fn [db [_ id]]
+      (assoc db :selected-entity {:id id})))
 
 (defn apply-position [db id]
       (let [entity (get-in db [:entities id])]
@@ -44,14 +52,18 @@
 (rf/reg-event-db
   :release-entity
   (fn [db] 
-  (let [timestamp (get-in db [:selected-entity :timestamp]) 
+  (let [timestamp (get-in db [:grabbed-entity :timestamp]) 
         time-diff (- (.getTime (js/Date.)) timestamp)] 
-    (if (or (get-in db [:selected-entity :move]) (> time-diff 200)) 
-      (assoc db :selected-entity nil) 
+    (if (or (get-in db [:grabbed-entity :move]) (> time-diff 200)) 
+      (-> (assoc db :grabbed-entity nil))
       (-> db 
-        (apply-position (get-in db [:selected-entity :id]))
-        (assoc :selected-entity nil))))))
+        (apply-position (get-in db [:grabbed-entity :id]))
+        (assoc :grabbed-entity nil))))))
 
+(rf/reg-event-db
+  :deselect-entity
+  (fn [db]
+    (assoc db :selected-entity nil)))
 
 
  (rf/reg-event-db
@@ -60,7 +72,7 @@
        (let [id (:id data)
              position (:position data)]
             (-> db 
-              (assoc-in [:selected-entity :moved] true)
+              (assoc-in [:grabbed-entity :moved] true)
               (assoc-in [:entities id :actions :next-position] position)))))
 
 (rf/reg-event-db
@@ -75,14 +87,18 @@
                                                 (assoc-in [:actions :next-position] nil))])) entities)
                                  (flatten)
                                  (apply hash-map))]
-             (assoc db :entities updated-entities))))
+             (do
+              (rf/dispatch [:deselect-entity])
+              (rf/dispatch [:release-entity])
+              (assoc db :entities updated-entities)))))
+
 
 (rf/reg-event-db
   :fast-apply-next-pos
   (fn [db [_ id]]
       (let [entity (get-in db [:entities id])]
-        (if-not (nil? (get-in entity [:actions :next-position])) 
-          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position])) 
+        (if-not (nil? (get-in entity [:actions :next-position]))
+          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position]))
           db))))
 
 ;; Subscriptions
@@ -98,13 +114,19 @@
     (:room-id db)))
 
 (rf/reg-sub
+  :grabbed-entity
+  (fn [db _]
+    (:grabbed-entity db)))
+
+(rf/reg-sub
   :selected-entity
   (fn [db _]
     (:selected-entity db)))
 ;; Views
 
 (defn entity-view
-  [ selected-entity-id
+  [ {grabbed-entity-id :grabbed-entity-id
+    selected-entity-id :selected-entity-id}
     {color :color
     [x y] :position
     actions :actions
@@ -127,19 +149,21 @@
                                       :r 20
                                       :fill color
                                       :on-mouse-down (fn []
-                                      (do
-                                        (println  id selected-entity-id)
-                                        (rf/dispatch [:grab-entity id])))
-                                      :on-touch-start #(rf/dispatch [:grab-entity id])}]
+                                        (rf/dispatch [:select-entity id])
+                                        (rf/dispatch [:grab-entity id]))
+                                      :on-touch-start (fn []
+                                        (rf/dispatch [:select-entity id])
+                                        (rf/dispatch [:grab-entity id]))}]
             (when (= selected-entity-id id)
-              [:circle.delete-symbol {:transform (str "translate(" (+ x 10) "," (- y 20) ")")
+              [:circle.animated-entity.delete-symbol {:transform (str "translate(" (+ x 15) ", " (- y 20) ")")
                                       :r 10
                                       :fill "#fffff"
                                       :on-mouse-down #(rf/dispatch [:delete-entity id])
                                       :on-touch-start #(rf/dispatch [:delete-entity id])}])]))
 
-(defn entities-view [{:keys [entities selected-entity-id]}]
-  [:g {} (map (partial entity-view selected-entity-id) entities)])
+(defn entities-view [{:keys [entities grabbed-entity-id selected-entity-id]}]
+  [:g {} (map (partial entity-view {:grabbed-entity-id grabbed-entity-id
+                                    :selected-entity-id selected-entity-id}) entities)])
 
 (defn menu-item-view [{icon :icon name :name}])
 (def menu-items [{:label "enemies"
@@ -163,6 +187,8 @@
 (defn main-view []
   (let [entities @(rf/subscribe [:entities])
         room-id @(rf/subscribe [:room-id])
+        grabbed-entity @(rf/subscribe [:grabbed-entity])
+        grabbed-entity-id (:id grabbed-entity)
         selected-entity @(rf/subscribe [:selected-entity])
         selected-entity-id (:id selected-entity)]
        [:div
@@ -171,19 +197,22 @@
           :on-mouse-move (fn [event] (let  [x (.-clientX event)
                                             y (.-clientY event)]
                                           
-                                          (if-not (nil? selected-entity-id)
-                                        (rf/dispatch [:update-next-position {:id selected-entity-id :position [x y]}]))))
+                                          (if-not (nil? grabbed-entity-id)
+                                        (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [x y]}]))))
         :on-touch-move (fn [event]
                           (let [touches (.. event -changedTouches)
                                 touch (.item touches 0)
                                 touch-x (.-clientX touch)
                                 touch-y (.-clientY touch)]
-                            (if-not (nil? selected-entity-id)  
-                            (rf/dispatch [:update-next-position {:id selected-entity-id :position [touch-x touch-y]}]))))  
-        ;;:on-mouse-up #(rf/dispatch [:release-entity])
-        ;;:on-touch-end #(rf/dispatch [:release-entity])
-        }
-         [entities-view {:entities entities :selected-entity-id selected-entity-id}]]
+                            (if-not (nil? grabbed-entity-id)  
+                            (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))
+        :on-mouse-up #(rf/dispatch [:release-entity])
+        :on-touch-end #(rf/dispatch [:release-entity])
+        :on-click (fn [] (when (nil? grabbed-entity)
+                          (rf/dispatch [:deselect-entity])))}
+         [entities-view {:entities entities
+                        :grabbed-entity-id grabbed-entity-id
+                        :selected-entity-id selected-entity-id}]]
         [:button
          {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]
         [:button

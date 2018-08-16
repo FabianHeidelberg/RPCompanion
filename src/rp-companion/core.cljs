@@ -41,6 +41,3 @@
     (events/listen EventType.NAVIGATE
       (fn [event] (secretary/dispatch! (.-token event))))
     (.setEnabled true)))
-
-(defn ^:export run
-  [])

@@ -11,7 +11,7 @@
   :hooks [leiningen.cljsbuild]
 
   :profiles {:dev {:cljsbuild
-                   {:builds {:client {:figwheel     {:on-jsload "rp-companion.core/run"}
+                   {:builds {:client {:figwheel     {}
                                       :compiler     {:main "rp-companion.core"
                                                      :asset-path "js"
                                                      :optimizations :none

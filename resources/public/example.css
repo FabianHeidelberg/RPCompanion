@@ -1,3 +1,6 @@
+body {
+    margin: 0;
+}
 
 div, h1, input {
     font-family: HelveticaNeue, Helvetica;
