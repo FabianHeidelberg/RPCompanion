@@ -8,8 +8,8 @@
 - [ ] Show Items/Loot
 - [ ] delete Elements
 - [ ] reveal changes button to update the player screen
-- [ ] Dashed Line for next position
-- [ ] show ghost for next position
+- [x] Dashed Line for next position
+- [x] show ghost for next position
 - [ ] Player can move his icon
 - [ ] DM has to approve new location
 - [ ] DM moves entities with a additional tap at the desired position
