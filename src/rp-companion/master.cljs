@@ -1,6 +1,7 @@
 (ns rp-companion.master
   (:require [reagent.core :as reagent]
-            [re-frame.core :as rf]))
+            [re-frame.core :as rf]
+            [rp-companion.utils :as utils]))
 
 
 ;; Event handler
@@ -22,6 +23,13 @@
           x (* 300 (Math/random))
           y (* 300 (Math/random))]
     (assoc-in db [:entities id] {:position [x y] :color "yellow" :id id} ))))
+
+(rf/reg-event-db
+  :delete-entity
+ (fn [db [_ id]]
+  (do
+    (println "called" id db)
+    (utils/dissoc-in db [:entities id]))))
 
 (rf/reg-event-db
   :grab-entity
