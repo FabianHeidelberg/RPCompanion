@@ -30,4 +30,6 @@
 
   :cljsbuild {:builds {:client {:source-paths ["src"]
                                 :compiler     {:output-dir "resources/public/js"
-                                               :output-to  "resources/public/js/client.js"}}}})
+                                               :output-to  "resources/public/js/client.js"
+                                               :npm-deps {:signalhub "4.9.0"}
+                                               :install-deps true}}}})

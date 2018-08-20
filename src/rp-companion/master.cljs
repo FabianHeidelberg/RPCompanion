@@ -1,7 +1,10 @@
 (ns rp-companion.master
   (:require [reagent.core :as reagent]
             [re-frame.core :as rf]
-            [cljsjs.simple-peer]))
+            [cljsjs.simple-peer]
+            [signalhub]))
+
+;;(defonce hub (signalhub/signalhub 'my-app-nbame' ["http://yourhub.com"]))
 
 (defonce master-peer (js/SimplePeer. #js {:trickle false}))
 (defn init-webrtc []
@@ -58,18 +61,18 @@
 
 (defn apply-position [db id]
       (let [entity (get-in db [:entities id])]
-        (if-not (nil? (get-in entity [:actions :next-position])) 
-          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position])) 
+        (if-not (nil? (get-in entity [:actions :next-position]))
+          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position]))
           db)))
 
 (rf/reg-event-db
   :release-entity
-  (fn [db] 
-  (let [timestamp (get-in db [:grabbed-entity :timestamp]) 
+  (fn [db]
+  (let [timestamp (get-in db [:grabbed-entity :timestamp])
         time-diff (- (.getTime (js/Date.)) timestamp)]
     (if (or (get-in db [:grabbed-entity :moved]) (> time-diff 200))
-      (assoc db :grabbed-entity nil) 
-      (-> db 
+      (assoc db :grabbed-entity nil)
+      (-> db
         (apply-position (get-in db [:grabbed-entity :id]))
         (assoc :grabbed-entity nil))))))
 
@@ -80,7 +83,7 @@
    (fn [db [_ data]]
        (let [id (:id data)
              position (:position data)]
-            (-> db 
+            (-> db
               (assoc-in [:grabbed-entity :moved] true)
               (assoc-in [:entities id :actions :next-position] position)))))
 
@@ -102,8 +105,8 @@
   :fast-apply-next-pos
   (fn [db [_ id]]
       (let [entity (get-in db [:entities id])]
-        (if-not (nil? (get-in entity [:actions :next-position])) 
-          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position])) 
+        (if-not (nil? (get-in entity [:actions :next-position]))
+          (assoc-in db [:entities id :position] (get-in entity [:actions :next-position]))
           db))))
 
 ;; Subscriptions
@@ -179,10 +182,10 @@
         grabbed-entity-id (:id grabbed-entity)]
        [:div
         [:svg
-         {:width 500 :height 500 
+         {:width 500 :height 500
           :on-mouse-move (fn [event] (let  [x (.-clientX event)
                                             y (.-clientY event)]
-                                          
+
                                           (if-not (nil? grabbed-entity-id)
                                         (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [x y]}]))))
         :on-touch-move (fn [event]
@@ -190,8 +193,8 @@
                                 touch (.item touches 0)
                                 touch-x (.-clientX touch)
                                 touch-y (.-clientY touch)]
-                            (if-not (nil? grabbed-entity-id)  
-                            (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))  
+                            (if-not (nil? grabbed-entity-id)
+                            (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))
         :on-mouse-up #(rf/dispatch [:release-entity])
         :on-touch-end #(rf/dispatch [:release-entity])}
          [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id}]]
