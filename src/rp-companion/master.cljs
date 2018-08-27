@@ -1,16 +1,17 @@
 (ns rp-companion.master
   (:require [reagent.core :as reagent]
             [re-frame.core :as rf]
-            [rp-companion.utils :as utils]))
-
+            [rp-companion.utils :as utils]
+            [rp-companion.interceptors :refer [app-event-handler]]))
 
 ;; Event handler
 
 (rf/reg-event-db
   :master/initialize
+  [app-event-handler]
   (fn [_ [_ room-id]]
     {:room-id room-id
-     :entities {}
+     :entities { 1 {:position [200 200] :icon "./assets/orc.svg" :id 1} }
       :menu nil
       :selection-state nil
       ;;
@@ -25,6 +26,7 @@
 
 (rf/reg-event-db
   :add-entity
+  [app-event-handler]
   (fn [db [_ {:keys [text icon position]}]]
     (let [id (rand)]
       (-> db
@@ -33,30 +35,31 @@
 
 (rf/reg-event-db
   :delete-entity
- (fn [db [_ id]]
-    (do
-      (rf/dispatch [:release-entity])
-      (rf/dispatch [:deselect-entity])
-      (utils/dissoc-in db [:entities id]))))
+  [app-event-handler]
+  (fn [db [_ id]]
+    (utils/dissoc-in db [:entities id])))
 
 (rf/reg-event-db
   :delete-ghost
- (fn [db [_ id]]
-    (do
-      (utils/dissoc-in db [:entities id :actions :next-position]))))
+  [app-event-handler]
+  (fn [db [_ id]]
+      (do
+        (utils/dissoc-in db [:entities id :actions :next-position]))))
 
 (rf/reg-event-db
   :grab-entity
- (fn [db [_ {:keys [id position]}]]
-    (assoc db :selection-state {:state :grabbed
-                                :id id
-                                :moved false
-                                :start-position position
-                                :timestamp (.getTime (js/Date.))
-                                :is-ghost false})))
+  [app-event-handler]
+  (fn [db [_ {:keys [id position]}]]
+      (assoc db :selection-state {:state :grabbed
+                                  :id id
+                                  :moved false
+                                  :start-position position
+                                  :timestamp (.getTime (js/Date.))
+                                  :is-ghost false})))
 
 (rf/reg-event-db
   :grab-ghost
+  [app-event-handler]
   (fn [db [_ {:keys [id position]}]]
     (assoc db :selection-state {:state :grabbed
                                 :id id
@@ -65,16 +68,17 @@
                                 :timestamp (.getTime (js/Date.))
                                 :is-ghost true})))
 
-
 (rf/reg-event-db
   :toggle-menu
+  [app-event-handler]
   (fn [db [_ [x y]]]
-   (if (nil? (:menu db)) (assoc db :menu {:position [x y]})
-     (dissoc db :menu))))
+    (if (nil? (:menu db)) (assoc db :menu {:position [x y]})
+      (dissoc db :menu))))
 
 
 (rf/reg-event-db
   :select-menu-type
+  [app-event-handler]
   (fn [db [_ type]]
     (assoc-in db [:menu :type] type)))
 
@@ -87,6 +91,7 @@
 
 (rf/reg-event-db
   :release-entity
+  [app-event-handler]
   (fn [db]
     (let [selection-state (:selection-state db)]
       (if (= (:state selection-state) :grabbed)
@@ -117,6 +122,7 @@
 
 (rf/reg-event-db
   :update-next-position
+  [app-event-handler]
   (fn [db [_ data]]
     (let [id (:id data)
             [x y] (:position data)
@@ -134,6 +140,7 @@
 
 (rf/reg-event-db
   :apply-next-pos
+  [app-event-handler]
   (fn [db _]
       (let [entities (:entities db)
             updated-entities (->> (map (fn [[key entity]]
@@ -145,47 +152,54 @@
                                  (flatten)
                                  (apply hash-map))]
            (do
-            (rf/dispatch [:deselect-entity])
-            (rf/dispatch [:release-entity])
             (assoc db :entities updated-entities)))))
 
 
 ;; Subscriptions
 
 (rf/reg-sub
-  :entities
+  :app
   (fn [db _]
-    (vals (:entities db))))
+    (:app db)))
+
+
+(rf/reg-sub
+  :entities
+  #(rf/subscribe [:app])
+  (fn [app]
+    (vals (:entities app))))
 
 (rf/reg-sub
   :room-id
-  (fn [db _]
-    (:room-id db)))
+  #(rf/subscribe [:app])
+  (fn [app _]
+    (:room-id app)))
 
 (rf/reg-sub
   :grabbed-entity-id
-  (fn [db _]
-    (let [selection-state (:selection-state db)]
+  #(rf/subscribe [:app])
+  (fn [app]
+    (let [selection-state (:selection-state app)]
       (if (= (:state selection-state) :grabbed)
         (:id selection-state)))))
 
 (rf/reg-sub
   :selected-entity
-  (fn [db _]
-    (let [selection-state (:selection-state db)]
+  #(rf/subscribe [:app])
+  (fn [app]
+    (let [selection-state (:selection-state app)]
       (if (= (:state selection-state) :selected)
         {:id (:id selection-state)
          :is-ghost (:is-ghost selection-state)}))))
 
 (rf/reg-sub
   :menu
-  (fn [db _]
-    (:menu db)))
+  #(rf/subscribe [:app])
+  (fn [app _]
+    (:menu app)))
 
 
 ;; Views
-
-(println "test" (:asdf nil))
 
 (defn entity-view
   [ { :keys [grabbed-entity-id selected-entity]}
@@ -373,7 +387,6 @@
           :on-mouse-up #(rf/dispatch [:release-entity])
           :on-mouse-leave (fn [event]
                           (let [id (.. event -target -id)]
-                            (println "mouse out target" (.. event -target -id))
                             (if (= id "background") (rf/dispatch [:release-entity]))))
           :on-touch-end #(rf/dispatch [:release-entity])}
          [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id :selected-entity selected-entity}]
@@ -382,4 +395,3 @@
          {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]
         [:button
          {:on-click #(rf/dispatch [:apply-next-pos])} "Apply changes"]]))
-
