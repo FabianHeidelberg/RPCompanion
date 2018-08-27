@@ -25,7 +25,7 @@
       :selected-entity nil}))
 
 (rf/reg-event-fx
-  :publish-state
+  :master/publish-state
   (fn [{{{:keys [room-id entities]} :app} :db}]
     {:firestore/set {:path [:rooms room-id]
                      :data {:entities entities}
@@ -34,31 +34,31 @@
                      :on-failure #(js/console.log "failed to publish state")}}))
 
 (rf/reg-event-fx
-  :add-entity
+  :master/add-entity
   [app-event-handler]
   (fn [{db :db} [_ {:keys [text icon position]}]]
     (let [id (rand)]
       {:db (-> db
         (assoc-in [:entities id] {:position position :icon icon :id id})
              (dissoc :menu))
-      :dispatch [:publish-state]})))
+      :dispatch [:master/publish-state]})))
 
 (rf/reg-event-fx
-  :delete-entity
+  :master/delete-entity
   [app-event-handler]
   (fn [{db :db} [_ id]]
     {:db (utils/dissoc-in db [:entities id])
-     :dispatch [:publish-state]}))
+     :dispatch [:master/publish-state]}))
 
 (rf/reg-event-db
-  :delete-ghost
+  :master/delete-ghost
   [app-event-handler]
   (fn [db [_ id]]
       (do
         (utils/dissoc-in db [:entities id :actions :next-position]))))
 
 (rf/reg-event-db
-  :grab-entity
+  :master/grab-entity
   [app-event-handler]
   (fn [db [_ {:keys [id position]}]]
       (assoc db :selection-state {:state :grabbed
@@ -69,7 +69,7 @@
                                   :is-ghost false})))
 
 (rf/reg-event-db
-  :grab-ghost
+  :master/grab-ghost
   [app-event-handler]
   (fn [db [_ {:keys [id position]}]]
     (assoc db :selection-state {:state :grabbed
@@ -80,14 +80,15 @@
                                 :is-ghost true})))
 
 (rf/reg-event-db
-  :toggle-menu
+  :master/toggle-menu
   [app-event-handler]
   (fn [db [_ [x y]]]
+    (println "toggle menu")
     (if (nil? (:menu db)) (assoc db :menu {:position [x y]})
       (dissoc db :menu))))
 
 (rf/reg-event-db
-  :select-menu-type
+  :master/select-menu-type
   [app-event-handler]
   (fn [db [_ type]]
     (assoc-in db [:menu :type] type)))
@@ -100,7 +101,7 @@
           db)))
 
 (rf/reg-event-fx
-  :release-entity
+  :master/release-entity
   [app-event-handler]
   (fn [{db :db}]
     {:db (let [selection-state (:selection-state db)]
@@ -128,11 +129,11 @@
                 ;;short click release entity
                 (assoc db :selection-state {:state :none})))))
               db))
-     :dispatch [:publish-state]}))
+     :dispatch [:master/publish-state]}))
 
 
 (rf/reg-event-db
-  :update-next-position
+  :master/update-next-position
   [app-event-handler]
   (fn [db [_ data]]
     (let [id (:id data)
@@ -150,7 +151,7 @@
                 db))))
 
 (rf/reg-event-fx
-  :apply-next-pos
+  :master/apply-next-pos
   [app-event-handler]
   (fn [{db :db} _]
       {:db (let [entities (:entities db)
@@ -163,40 +164,39 @@
                                  (flatten)
                                  (apply hash-map))]
               (assoc db :entities updated-entities))
-      :dispatch [:publish-state]}))
+      :dispatch [:master/publish-state]}))
 
 
 ;; Subscriptions
 
 (rf/reg-sub
-  :app
+  :master/app
   (fn [db _]
     (:app db)))
 
-
 (rf/reg-sub
-  :entities
-  #(rf/subscribe [:app])
+  :master/entities
+  #(rf/subscribe [:master/app])
   (fn [app]
     (vals (:entities app))))
 
 (rf/reg-sub
-  :room-id
-  #(rf/subscribe [:app])
+  :master/room-id
+  #(rf/subscribe [:master/app])
   (fn [app _]
     (:room-id app)))
 
 (rf/reg-sub
-  :grabbed-entity-id
-  #(rf/subscribe [:app])
+  :master/grabbed-entity-id
+  #(rf/subscribe [:master/app])
   (fn [app]
     (let [selection-state (:selection-state app)]
       (if (= (:state selection-state) :grabbed)
         (:id selection-state)))))
 
 (rf/reg-sub
-  :selected-entity
-  #(rf/subscribe [:app])
+  :master/selected-entity
+  #(rf/subscribe [:master/app])
   (fn [app]
     (let [selection-state (:selection-state app)]
       (if (= (:state selection-state) :selected)
@@ -204,8 +204,8 @@
          :is-ghost (:is-ghost selection-state)}))))
 
 (rf/reg-sub
-  :menu
-  #(rf/subscribe [:app])
+  :master/menu
+  #(rf/subscribe [:master/app])
   (fn [app _]
     (:menu app)))
 
@@ -213,7 +213,7 @@
 ;; Views
 
 (defn entity-view
-  [ { :keys [grabbed-entity-id selected-entity]}
+  [ {:keys [grabbed-entity-id selected-entity]}
     {icon :icon
      [x y] :position
      actions :actions
@@ -236,13 +236,13 @@
                                  :on-mouse-down (fn [event]
                                                   (let  [x (.-clientX event)
                                                          y (.-clientY event)]
-                                                          (rf/dispatch [:grab-ghost {:id id :position [x y]}])))
+                                                          (rf/dispatch [:master/grab-ghost {:id id :position [x y]}])))
                                  :on-touch-start (fn [event]
                                                     (let [touches (.. event -changedTouches)
                                                           touch (.item touches 0)
                                                           touch-x (.-clientX touch)
                                                           touch-y (.-clientY touch)]
-                                                            (rf/dispatch [:grab-ghost {:id id :position [x y]}])))
+                                                            (rf/dispatch [:master/grab-ghost {:id id :position [x y]}])))
                                  :on-click #(.stopPropagation %)
                                  :on-drag-start #(constantly false)
                                  :on-drag-end #(constantly false)}])
@@ -255,27 +255,30 @@
                                   :on-mouse-down (fn [event]
                                                   (let  [x (.-clientX event)
                                                         y (.-clientY event)]
-                                                          (rf/dispatch [:grab-entity {:id id :position [x y]}])))
+                                                          (rf/dispatch [:master/grab-entity {:id id :position [x y]}])))
                                   :on-touch-start (fn [event]
                                                     (let [touches (.. event -changedTouches)
                                                           touch (.item touches 0)
                                                           touch-x (.-clientX touch)
                                                           touch-y (.-clientY touch)]
-                                                            (rf/dispatch [:grab-entity {:id id :position [x y]}])))}]
+                                                            (rf/dispatch [:master/grab-entity {:id id :position [x y]}])))}]
         (when (and (= selected-entity-id id) is-ghost )
-              [:circle.delete-ghost-symbol {:transform (str "translate(" (+ next-x 15) ", " (- next-y 20) ")")
-                                                      :r 10
-                                                      :fill "#fffff"
-                                                      :on-click (fn [evt]
-                                                                        (.stopPropagation evt)
-                                                                        (rf/dispatch [:delete-ghost id]))}])
+              [:image {:transform (str "translate(" (+ next-x 7) ", " (- next-y 32) ")")
+                       :width 32
+                       :height 32
+                       :href "./assets/delete-icon.svg"
+                       :on-click (fn [evt]
+                                    (.stopPropagation evt)
+                                    (rf/dispatch [:master/delete-ghost id]))}])
         (when (and (= selected-entity-id id) (not is-ghost) )
-              [:circle.delete-symbol {:transform (str "translate(" (+ x 15) ", " (- y 20) ")")
-                                                      :r 10
-                                                      :fill "#fffff"
-                                                      :on-click (fn [evt]
-                                                                        (.stopPropagation evt)
-                                                                        (rf/dispatch [:delete-entity id]))}])]))
+              [:image {:transform (str "translate(" (+ x 7) ", " (- y 32) ")")
+                       :width 32
+                       :height 32
+                       :href "./assets/delete-icon.svg"
+                       :on-click (fn [evt]
+                                    (.stopPropagation evt)
+                                    (rf/dispatch [:master/delete-entity id]))}])]))
+
 
 (defn entities-view [{:keys [entities grabbed-entity-id selected-entity]}]
 
@@ -319,7 +322,7 @@
                  :height 40
                  :on-click (fn [evt]
                                (.stopPropagation evt)
-                               (rf/dispatch [:select-menu-type :enemies]))}]
+                               (rf/dispatch [:master/select-menu-type :enemies]))}]
     [:image {:transform (translate-helper {:deg 120 :r 50})
               :href "./assets/sack.svg"
               :x -20
@@ -328,7 +331,7 @@
               :height 40
               :on-click (fn [evt]
                             (.stopPropagation evt)
-                            (rf/dispatch [:select-menu-type :objects]))}]
+                            (rf/dispatch [:master/select-menu-type :objects]))}]
     [:image {:transform (translate-helper {:deg 240 :r 50})
               :href "./assets/sword.svg"
               :x -20
@@ -337,7 +340,7 @@
               :height 40
               :on-click (fn [evt]
                             (.stopPropagation evt)
-                            (rf/dispatch [:select-menu-type :players]))}]
+                            (rf/dispatch [:master/select-menu-type :players]))}]
     [:circle {:transform (str "rotate(0) translate(0, 0)")
               :href (str "./assets/sack.svg")
               :cx 0
@@ -349,7 +352,7 @@
               :fill (str "none")
               :on-click (fn [evt]
                             (.stopPropagation evt)
-                            (rf/dispatch [:select-menu-type :objects]))}]]
+                            (rf/dispatch [:master/select-menu-type :objects]))}]]
 
    [:g [:g (map-indexed (fn [index item] [:image {:key index
                                                   :transform (translate-helper {:deg (* index (/ 360 (count (get-in menu-items [type :type-instances])))) :r 50})
@@ -358,7 +361,7 @@
                                                   :height 40
                                                   :x -20
                                                   :y -20
-                                                  :on-click #(rf/dispatch [:add-entity {:position [x y] :icon (:icon item)}])}]) (get-in menu-items [type :type-instances]))]
+                                                  :on-click #(rf/dispatch [:master/add-entity {:position [x y] :icon (:icon item)}])}]) (get-in menu-items [type :type-instances]))]
        [:circle {:transform (str "rotate(0) translate(0, 0)")
                  :href (str "./assets/sack.svg")
                  :cx 0
@@ -370,40 +373,38 @@
                  :fill (str "none")
                  :on-click (fn [evt]
                                (.stopPropagation evt)
-                               (rf/dispatch [:select-menu-type :objects]))}]])])
+                               (rf/dispatch [:master/select-menu-type :objects]))}]])])
 
 (defn main-view []
-  (let [entities @(rf/subscribe [:entities])
-        room-id @(rf/subscribe [:room-id])
-        grabbed-entity-id @(rf/subscribe [:grabbed-entity-id])
-        selected-entity @(rf/subscribe [:selected-entity])
-        menu @(rf/subscribe [:menu])]
+  (let [entities @(rf/subscribe [:master/entities])
+        room-id @(rf/subscribe [:master/room-id])
+        grabbed-entity-id @(rf/subscribe [:master/grabbed-entity-id])
+        selected-entity @(rf/subscribe [:master/selected-entity])
+        menu @(rf/subscribe [:master/menu])]
        [:div
         [:svg
          {:width 500 :height 500 :id "background"
           :on-mouse-move (fn [event] (let  [x (.-clientX event)
                                             y (.-clientY event)]
                                           (if-not (nil? grabbed-entity-id)
-                                           (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [x y]}]))))
+                                           (rf/dispatch [:master/update-next-position {:id grabbed-entity-id :position [x y]}]))))
           :on-touch-move (fn [event]
                             (let [touches (.. event -changedTouches)
                                   touch (.item touches 0)
                                   touch-x (.-clientX touch)
                                   touch-y (.-clientY touch)]
                               (if-not (nil? grabbed-entity-id)
-                               (rf/dispatch [:update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))
+                               (rf/dispatch [:master/update-next-position {:id grabbed-entity-id :position [touch-x touch-y]}]))))
           :on-click (fn [event] (let [x (.-clientX event)
                                       y (.-clientY event)
                                       id (.. event -target -id)]
-                                     (if (= id "background") (rf/dispatch [:toggle-menu [x y]]))))
-          :on-mouse-up #(rf/dispatch [:release-entity])
+                                     (if (= id "background") (rf/dispatch [:master/toggle-menu [x y]]))))
+          :on-mouse-up #(rf/dispatch [:master/release-entity])
           :on-mouse-leave (fn [event]
                           (let [id (.. event -target -id)]
-                            (if (= id "background") (rf/dispatch [:release-entity]))))
-          :on-touch-end #(rf/dispatch [:release-entity])}
+                            (if (= id "background") (rf/dispatch [:master/release-entity]))))
+          :on-touch-end #(rf/dispatch [:master/release-entity])}
          [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id :selected-entity selected-entity}]
          (if-not (nil? menu)[menu-view menu])]
         [:button
-         {:on-click #(rf/dispatch [:add-entity])} "Add Entity"]
-        [:button
-         {:on-click #(rf/dispatch [:apply-next-pos])} "Apply changes"]]))
+         {:on-click #(rf/dispatch [:master/apply-next-pos])} "Apply changes"]]))
