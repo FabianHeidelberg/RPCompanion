@@ -50,6 +50,7 @@
    :databaseURL "https://rp-companion.firebaseio.com"
    :projectId "rp-companion"
    :storageBucket "rp-companion.appspot.com"
+   :firestore-settings     {:timestampsInSnapshots true}
    :messagingSenderId "139282990817"})
 
 (rf/reg-event-db :set-user (fn [db [_ user]]
