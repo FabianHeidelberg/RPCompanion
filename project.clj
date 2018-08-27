@@ -1,6 +1,6 @@
 (defproject rp-companion "1.0.0"
   :dependencies [[org.clojure/clojure        "1.8.0"]
-                 [org.clojure/clojurescript  "1.9.908"]
+                 [org.clojure/clojurescript  "1.9.854"]
                  [reagent  "0.7.0"]
                  [re-frame "0.10.5"]
                  [secretary "1.2.3"]
@@ -31,5 +31,4 @@
   :cljsbuild {:builds {:client {:source-paths ["src"]
                                 :compiler     {:output-dir "resources/public/js"
                                                :output-to  "resources/public/js/client.js"
-                                               :npm-deps {:signalhub "4.9.0"}
                                                :install-deps true}}}})

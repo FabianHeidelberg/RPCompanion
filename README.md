@@ -1,9 +1,9 @@
 # RPCompanion
 DMs new best companion
 
-
 Run the project
 
 ```
-lein do clean, figwheel
+npm install
+npm run dev
 ```

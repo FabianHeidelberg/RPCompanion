@@ -12,3 +12,5 @@ pom.xml.asc
 .lein-failures
 .nrepl-port
 resources/public/js
+resources/public/external-deps.js
+node_modules

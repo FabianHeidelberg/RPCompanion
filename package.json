@@ -1,4 +1,16 @@
 {
+  "name": "external-deps",
+  "description": "bundle external dependencies into static js file",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm run build-external-deps && lein do clean, figwheel",
+    "build-external-deps": "browserify external-deps.js > resources/public/external-deps.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "browserify": "^16.2.2"
+  },
   "dependencies": {
     "@cljs-oss/module-deps": "^1.1.1",
     "signalhub": "^4.9.0"

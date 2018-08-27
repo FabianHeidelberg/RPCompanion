@@ -1,10 +1,9 @@
 (ns rp-companion.master
   (:require [reagent.core :as reagent]
             [re-frame.core :as rf]
-            [cljsjs.simple-peer]
-            [signalhub]))
+            [cljsjs.simple-peer]))
 
-;;(defonce hub (signalhub/signalhub 'my-app-nbame' ["http://yourhub.com"]))
+(defonce hub (js/signalhub. 'my-app-nbame' #js ["https://signalhub-hzbibrznqa.now.sh"]))
 
 (defonce master-peer (js/SimplePeer. #js {:trickle false}))
 (defn init-webrtc []
@@ -16,14 +15,14 @@
   (.on master-peer "connect" (fn [] (println "Connected master")))
   (.on master-peer "data" (fn [data] (println "data" data))))
 
-  (rf/reg-event-fx
+  '(rf/reg-event-fx
   :signal-master
   (fn [incoming-effects [_ data]]
     (do
       (println "Master data" (js/JSON.stringify data))
       (.signal master-peer data))))
 
-  (rf/reg-event-fx
+  '(rf/reg-event-fx
    :send-viewer-data
    (fn [incoming-effects [_ data]]
      (do
