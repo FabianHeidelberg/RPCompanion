@@ -24,20 +24,31 @@
       :grabbed-entity nil
       :selected-entity nil}))
 
-(rf/reg-event-db
+(rf/reg-event-fx
+  :publish-state
+  (fn [{{{:keys [room-id entities]} :app} :db}]
+    {:firestore/set {:path [:rooms room-id]
+                     :data {:entities entities}
+                     :set-options {:merge false}
+                     :on-success #(js/console.log "published new state")
+                     :on-failure #(js/console.log "failed to publish state")}}))
+
+(rf/reg-event-fx
   :add-entity
   [app-event-handler]
-  (fn [db [_ {:keys [text icon position]}]]
+  (fn [{db :db} [_ {:keys [text icon position]}]]
     (let [id (rand)]
-      (-> db
+      {:db (-> db
         (assoc-in [:entities id] {:position position :icon icon :id id})
-        (dissoc :menu)))))
+             (dissoc :menu))
+      :dispatch [:publish-state]})))
 
-(rf/reg-event-db
+(rf/reg-event-fx
   :delete-entity
   [app-event-handler]
-  (fn [db [_ id]]
-    (utils/dissoc-in db [:entities id])))
+  (fn [{db :db} [_ id]]
+    {:db (utils/dissoc-in db [:entities id])
+     :dispatch [:publish-state]}))
 
 (rf/reg-event-db
   :delete-ghost
@@ -75,7 +86,6 @@
     (if (nil? (:menu db)) (assoc db :menu {:position [x y]})
       (dissoc db :menu))))
 
-
 (rf/reg-event-db
   :select-menu-type
   [app-event-handler]
@@ -89,11 +99,11 @@
           (assoc-in db [:entities id :position] (get-in entity [:actions :next-position]))
           db)))
 
-(rf/reg-event-db
+(rf/reg-event-fx
   :release-entity
   [app-event-handler]
-  (fn [db]
-    (let [selection-state (:selection-state db)]
+  (fn [{db :db}]
+    {:db (let [selection-state (:selection-state db)]
       (if (= (:state selection-state) :grabbed)
         (let [id (:id selection-state)
               timestamp (:timestamp selection-state)
@@ -117,7 +127,8 @@
                 (assoc db :selection-state {:state :selected :is-ghost false :id id})
                 ;;short click release entity
                 (assoc db :selection-state {:state :none})))))
-          db))))
+              db))
+     :dispatch [:publish-state]}))
 
 
 (rf/reg-event-db
@@ -138,12 +149,12 @@
                 db))
                 db))))
 
-(rf/reg-event-db
+(rf/reg-event-fx
   :apply-next-pos
   [app-event-handler]
-  (fn [db _]
-      (let [entities (:entities db)
-            updated-entities (->> (map (fn [[key entity]]
+  (fn [{db :db} _]
+      {:db (let [entities (:entities db)
+                 updated-entities (->> (map (fn [[key entity]]
                                         (let [old-position (:position entity)
                                                new-position (get-in entity [:actions :next-position])]
                                           [key (-> entity
@@ -151,8 +162,8 @@
                                                 (assoc-in [:actions :next-position] nil))])) entities)
                                  (flatten)
                                  (apply hash-map))]
-           (do
-            (assoc db :entities updated-entities)))))
+              (assoc db :entities updated-entities))
+      :dispatch [:publish-state]}))
 
 
 ;; Subscriptions
@@ -340,7 +351,8 @@
                             (.stopPropagation evt)
                             (rf/dispatch [:select-menu-type :objects]))}]]
 
-   [:g [:g (map-indexed (fn [index item] [:image {:transform (translate-helper {:deg (* index (/ 360 (count (get-in menu-items [type :type-instances])))) :r 50})
+   [:g [:g (map-indexed (fn [index item] [:image {:key index
+                                                  :transform (translate-helper {:deg (* index (/ 360 (count (get-in menu-items [type :type-instances])))) :r 50})
                                                   :href (:icon item)
                                                   :width 40
                                                   :height 40

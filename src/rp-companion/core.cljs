@@ -12,7 +12,6 @@
   (:import [goog History]
            [goog.history EventType]))
 
-;;(devtools/install!)
 (enable-console-print!)
 
 (def app-node (js/document.getElementById "app"))
@@ -43,22 +42,24 @@
       (fn [event] (secretary/dispatch! (.-token event))))
     (.setEnabled true)))
 
-
 ;; Setup firebase
 
 (defonce firebase-app-info
   {:apiKey "AIzaSyDma65tAeli5ZbSRz7c3KbIyjSqaOyqUUE"
    :authDomain "rp-companion.firebaseapp.com"
    :databaseURL "https://rp-companion.firebaseio.com"
-   :storageBucket "rp-companion.appspot.com"})
+   :projectId "rp-companion"
+   :storageBucket "rp-companion.appspot.com"
+   :messagingSenderId "139282990817"})
 
+(rf/reg-event-db :set-user (fn [db [_ user]]
+  (println "setuser" user)
+  (assoc db :user user)))
 
-(rf/reg-event-db :set-user (fn [db [_ user]] (assoc db :user user)))
 (rf/reg-sub :user (fn [db _] (:user db)))
 
 (firebase/init
   :firebase-app-info firebase-app-info
   :firestore-settings {:timestampsInSnapshots true} ; See: https://firebase.google.com/docs/reference/js/firebase.firestore.Settings
   :get-user-sub      [:user]
-  :set-user-event    [:set-user]
-)
+  :set-user-event    [:set-user])

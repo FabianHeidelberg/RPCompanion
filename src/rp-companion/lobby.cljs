@@ -19,20 +19,17 @@
   (fn [_ _]
     {:room-id "" }))
 
-
 (rf/reg-event-db
   :update-room-id
   [app-event-handler]
   (fn [db [_ value]]
     (assoc db :room-id value)))
 
-
 (rf/reg-event-fx
   :join-game
   [app-event-handler]
   (fn [_ [_ room-id]]
     {:navigate-to (str "viewer/" room-id) }))
-
 
 (rf/reg-event-fx
   :create-game
