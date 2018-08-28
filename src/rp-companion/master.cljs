@@ -11,12 +11,16 @@
   [app-event-handler]
   (fn [_ [_ room-id]]
     {:room-id room-id
-     :entities { 1 {:position [200 200] :icon "./assets/orc.svg" :id 1} }
+     :entities {}
+      ;; Example for an entity:
+      ;; { 1 {:position [200 200] :icon "./assets/orc.svg" :id 1 :actions {:next-position [100 100]}} }
+      ;;
       :menu nil
       :selection-state nil
       ;;
       ;; 3 possible states
       ;;
+      ;; Examples:
       ;; {:state :none}
       ;; {:state :grabbed :id 1 :start-position [x y] :moved true :timestamp 123123 :is-ghost false}
       ;; {:state :selected :id 1 :is-ghost false}")

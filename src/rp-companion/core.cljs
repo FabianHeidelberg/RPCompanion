@@ -33,15 +33,6 @@
     (rf/dispatch-sync [:viewer/initialize id])
     (reagent/render [viewer/main-view] app-node)))
 
-
-;; Hookup routing
-
-(def history
-  (doto (History.)
-    (events/listen EventType.NAVIGATE
-      (fn [event] (secretary/dispatch! (.-token event))))
-    (.setEnabled true)))
-
 ;; Setup firebase
 
 (defonce firebase-app-info
@@ -64,3 +55,11 @@
   :firestore-settings {:timestampsInSnapshots true} ; See: https://firebase.google.com/docs/reference/js/firebase.firestore.Settings
   :get-user-sub      [:user]
   :set-user-event    [:set-user])
+
+;; Hookup routing
+
+(def history
+  (doto (History.)
+    (events/listen EventType.NAVIGATE
+      (fn [event] (secretary/dispatch! (.-token event))))
+    (.setEnabled true)))

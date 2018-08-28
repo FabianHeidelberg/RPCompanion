@@ -4,14 +4,6 @@
             [rp-companion.interceptors :refer [app-event-handler]]))
 
 ;; Event handlers
-
-(rf/reg-event-fx
-  :example-2-listen
-  (fn [_ _] {:firestore/on-snapshot {:path-document [:rooms "foobar"]
-                                     :doc-changes true
-                                     :on-next #(print "next")}}))
-
-
 (rf/reg-event-db
   :viewer/initialize
   [app-event-handler]
@@ -22,19 +14,32 @@
 ;; Subscriptions
 
 (rf/reg-sub
-  :example-1-value2s
+  :viewer/entities
   (fn [_ _]
-    (rf/subscribe [:firestore/on-snapshot {:path-document [:rooms "foobar"]}]))
+    (rf/subscribe [:firestore/on-snapshot {:path-document [:rooms "myquest"]}]))
   (fn [value _]
-    value))
+    (let [entities (vals (get-in value [:data "entities"])) ]
+      (map
+        (fn [entity] {:id (get entity "id")
+                      :position (get entity "position")
+                      :icon (get entity "icon")})
+        entities))))
 
 ;; Views
 
+(defn entity-view
+  [{icon :icon
+   [x y] :position
+   id :id}]
+  (println icon x y id)
+  [:image.animated-entity {:transform (str "translate(" (- x 20) "," (- y 20) ")")
+                            :width 40
+                            :height 40
+                            :href icon
+                            :key id}])
 
 (defn main-view []
-  (let [value2 @(rf/subscribe [:example-1-value2])
-  ]
-    [:div {}
-      [:h1 "viewer" ]
-      [:p (str value2)]
-      ]))
+  (let [entities @(rf/subscribe [:viewer/entities])]
+    [:svg
+      {:width 500 :height 500 :id "background" }
+        (map entity-view entities)]))
