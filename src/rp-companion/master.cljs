@@ -385,9 +385,9 @@
         grabbed-entity-id @(rf/subscribe [:master/grabbed-entity-id])
         selected-entity @(rf/subscribe [:master/selected-entity])
         menu @(rf/subscribe [:master/menu])]
-       [:div
-        [:svg
-         {:width 500 :height 500 :id "background"
+       [:div.game-wrapper
+        [:svg.game
+         {:width 1366 :height 768 :id "background"
           :on-mouse-move (fn [event] (let  [x (.-clientX event)
                                             y (.-clientY event)]
                                           (if-not (nil? grabbed-entity-id)
@@ -410,5 +410,5 @@
           :on-touch-end #(rf/dispatch [:master/release-entity])}
          [entities-view {:entities entities :grabbed-entity-id grabbed-entity-id :selected-entity selected-entity}]
          (if-not (nil? menu)[menu-view menu])]
-        [:button
-         {:on-click #(rf/dispatch [:master/apply-next-pos])} "Apply changes"]]))
+        [:button.move-all-button.pure-button
+         {:on-click #(rf/dispatch [:master/apply-next-pos])} "move all"]]))

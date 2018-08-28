@@ -47,17 +47,22 @@
 
 (defn main-view []
   (let [ room-id @(rf/subscribe [:lobby/room-id])]
-    [:div {}
-      [:label {:for "room"}]
+    [:div.lobby.pure-form.pure-form-stacked {}
+      [:div.lobby-header
+        [:img {:src "./assets/barbarian.svg"}]
+        [:h1 "RP Companion"]
+        [:img {:src "./assets/chest.svg"}]]
+      [:label {:for "room"} "Room"]
       [:input {:id "room"
                :type "text"
                :value room-id
                :on-change (fn [evt]
                               (rf/dispatch [:lobby/update-room-id (-> evt .-target .-value)]))}]
       [:p
-        [:button {:on-click #(rf/dispatch [:lobby/join-game room-id])
+        [:button.pure-button {:on-click #(rf/dispatch [:lobby/join-game room-id])
                   :disabled (string/blank? room-id)}
                   "join game"]
-        [:button {:on-click #(rf/dispatch [:lobby/create-game room-id])
+        [:span " "]
+        [:button.pure-button {:on-click #(rf/dispatch [:lobby/create-game room-id])
                   :disabled (string/blank? room-id)}
                   "create game"]]]))

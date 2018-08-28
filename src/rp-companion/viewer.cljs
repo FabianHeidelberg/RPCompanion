@@ -40,6 +40,7 @@
 
 (defn main-view []
   (let [entities @(rf/subscribe [:viewer/entities])]
-    [:svg
-      {:width 500 :height 500 :id "background" }
-        (map entity-view entities)]))
+    [:div.game-wrapper
+      [:svg.game
+        {:width 1366 :height 768 }
+          (map entity-view entities)]]))
